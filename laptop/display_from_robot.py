@@ -1,5 +1,6 @@
 import asyncio
 import json
+from pprint import pprint
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
@@ -27,6 +28,7 @@ class RobotDisplay:
             # print(f"Received data: {line}")
             try:
                 message = json.loads(line)
+                pprint(message)
             except ValueError:
                 print("Error parsing JSON")
                 return
@@ -36,8 +38,7 @@ class RobotDisplay:
                 self.pose_list.append(message["pose"])
                 if len(self.pose_list) > 3:
                     _ = self.pose_list.pop(0)
-                self.poses = np.array(self.pose_list, dtype=np.float64)
-                print(self.pose_list[-1])
+                self.poses = np.array(self.pose_list, dtype=np.float32)
 
     def draw(self):
         self.axes.clear()
@@ -47,7 +48,6 @@ class RobotDisplay:
                     [line[0][0], line[1][0]], [line[0][1], line[1][1]], color="black"
                 )
         if self.poses is not None:
-            print(self.poses)
             self.axes.scatter(self.poses[:,0], self.poses[:,1], color="blue")
 
     async def send_command(self, command):
