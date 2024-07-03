@@ -1,4 +1,5 @@
-"""Represent the lines of the arena (dimensions in m)"""
+# arena.py
+"""Represent the lines bounding arena (dimensions in m)"""
 
 width = 1.500
 height = 1.500

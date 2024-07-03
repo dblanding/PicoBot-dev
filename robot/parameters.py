@@ -22,4 +22,4 @@ TURN_SPD = 30_000
 ANGLE_TOL = 0.035  # radians (2 degrees)
 
 # ratio of spd to joystick value
-SPD_GAIN = 2
+JS_GAIN = 2

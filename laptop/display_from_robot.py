@@ -14,6 +14,7 @@ class RobotDisplay:
         self.arena = {}
         self.closed = False
         self.fig, self.axes = plt.subplots()
+        self.pose_list = []
         self.poses = None
 
     def handle_close(self, _):
@@ -23,7 +24,7 @@ class RobotDisplay:
         self.buffer += data.decode()
         while "\n" in self.buffer:
             line, self.buffer = self.buffer.split("\n", 1)
-            print(f"Received data: {line}")
+            # print(f"Received data: {line}")
             try:
                 message = json.loads(line)
             except ValueError:
@@ -31,8 +32,12 @@ class RobotDisplay:
                 return
             if "arena" in message:
                 self.arena = message
-            if "poses" in message:
-                self.poses = np.array(message["poses"], dtype=np.int16)
+            if "pose" in message:
+                self.pose_list.append(message["pose"])
+                if len(self.pose_list) > 3:
+                    _ = self.pose_list.pop(0)
+                self.poses = np.array(self.pose_list, dtype=np.float64)
+                print(self.pose_list[-1])
 
     def draw(self):
         self.axes.clear()
@@ -42,6 +47,7 @@ class RobotDisplay:
                     [line[0][0], line[1][0]], [line[0][1], line[1][1]], color="black"
                 )
         if self.poses is not None:
+            print(self.poses)
             self.axes.scatter(self.poses[:,0], self.poses[:,1], color="blue")
 
     async def send_command(self, command):
