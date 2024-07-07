@@ -20,8 +20,8 @@ from parameters import JS_GAIN
 import struct
 from bno055 import BNO055
 import VL53L0X
-
 import arena
+
 # set up uart0 for communication with BLE UART friend
 print("setting up uart0 for accepting tele-op joystick commands")
 uart0 = UART(0, 9600)
@@ -40,21 +40,29 @@ enc_a = encoder.Encoder(1, Pin(6))
 # setup onboard LED
 led = machine.Pin("LED", machine.Pin.OUT)
 
-# set up left VCSEL TOF distance sensor on I2C0
-i2c0 = I2C(0, sda=Pin(12), scl=Pin(13))
-tof0 = VL53L0X.VL53L0X(i2c0)
-tof0.start()
-
-# set up right VCSEL TOF distance sensor on I2C1
-i2c1 = I2C(1, sda=Pin(10), scl=Pin(11))
-tof1 = VL53L0X.VL53L0X(i2c1)
-tof1.start()
-
-# set up bno055 IMU on I2C1
-imu = BNO055(i2c1)
-
 # instantiate odometer
 odom = Odometer()
+
+# set up multiplexer on I2C0
+i2c0 = I2C(0, sda=Pin(12), scl=Pin(13))
+
+# set up IMU on I2C1
+i2c1 = I2C(1, sda=Pin(10), scl=Pin(11))
+imu = BNO055(i2c1)
+
+def get_dist(channel):
+    """
+    return dist (mm) from tof sensor on mux
+        channel = b'\x02'  # left sensor on ch 1
+        channel = b'\x04'  # right sensor on ch 2
+    see: https://github.com/mcauser/micropython-tca9548a
+    """
+    i2c0.writeto(0x70, channel)
+    tof = VL53L0X.VL53L0X(i2c0)
+    tof.start()
+    dist = tof.read()
+    tof.stop()
+    return dist
 
 def send_json(data):
     uart1.write((json.dumps(data) + "\n").encode())
@@ -90,8 +98,8 @@ class Robot():
                     yaw += 2 * math.pi
 
                 # read distances from sensors
-                dist0 = tof0.read()
-                dist1 = tof1.read()
+                dist_L = get_dist(b'\x02')
+                dist_R = get_dist(b'\x04')
 
                 # Check for tele-op commands
                 if uart0.any() > 0:
@@ -113,15 +121,15 @@ class Robot():
 
                 # get current pose
                 pose = odom.update(enc_a.value(), enc_b.value())
-                print(pose, yaw)
+                print(pose, yaw, dist_L, dist_R)
 
                 # send robot data to laptop
                 if pose != (0, 0, 0):
                     send_json({
                         "pose": list(pose),
                         "yaw": yaw,
-                        "dist0": dist0,
-                        "dist1": dist1,
+                        "dist_L": dist_L,
+                        "dist_R": dist_R,
                         })
 
                 led.toggle()
