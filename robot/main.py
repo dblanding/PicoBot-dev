@@ -43,12 +43,17 @@ led = machine.Pin("LED", machine.Pin.OUT)
 # instantiate odometer
 odom = Odometer()
 
-# set up multiplexer on I2C0
+# set up multiplexer on i2c0
 i2c0 = I2C(0, sda=Pin(12), scl=Pin(13))
 
-# set up IMU on I2C1
-i2c1 = I2C(1, sda=Pin(10), scl=Pin(11))
+# set up IMU on i2c1
+i2c1 = I2C(1, sda=Pin(14), scl=Pin(15))
+print(i2c1.scan())
 imu = BNO055(i2c1)
+
+# set up forward looking dist sensor on i2c1
+tof1 = VL53L0X.VL53L0X(i2c1)
+tof1.start()
 
 def get_dist(channel):
     """
@@ -97,10 +102,11 @@ class Robot():
                 if yaw < -math.pi:
                     yaw += 2 * math.pi
 
-                # read distances from sensors
+                # read distances from VCSEL sensors
                 dist_L = get_dist(b'\x02')
                 dist_R = get_dist(b'\x04')
-
+                dist_F = tof1.read()
+    
                 # Check for tele-op commands
                 if uart0.any() > 0:
                     try:
@@ -121,7 +127,7 @@ class Robot():
 
                 # get current pose
                 pose = odom.update(enc_a.value(), enc_b.value())
-                print(pose, yaw, dist_L, dist_R)
+                print(pose, yaw, dist_L, dist_R, dist_F)
 
                 # send robot data to laptop
                 if pose != (0, 0, 0):
@@ -130,6 +136,7 @@ class Robot():
                         "yaw": yaw,
                         "dist_L": dist_L,
                         "dist_R": dist_R,
+                        "dist_F": dist_F,
                         })
 
                 led.toggle()

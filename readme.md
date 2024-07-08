@@ -45,5 +45,6 @@
 * A full size breadboard is needed to hold everything.
 * Took the opportunity to put the right and left VCSEL distance sensors directly above the wheels.
 ![PicoBot electronics](imgs/picobot_electronics.jpg)
-
+* Added forwaard looking VCSEL distance sensor
+![PicoBot w/ all 3 distance sensors](imgs/with_fwd_dist_sensor.jpg)
 
