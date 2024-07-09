@@ -4,7 +4,7 @@ from pprint import pprint
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
-
+from geom2d import pt_coords
 from robot_ble_connection import BleConnection
 
 
@@ -17,6 +17,8 @@ class RobotDisplay:
         self.fig, self.axes = plt.subplots()
         self.pose_list = []
         self.poses = None
+        self.pnts_detected = []
+        self.points = None
 
     def handle_close(self, _):
         self.closed = True
@@ -35,10 +37,17 @@ class RobotDisplay:
             if "arena" in message:
                 self.arena = message
             if "pose" in message:
-                self.pose_list.append(message["pose"])
+                pose = message["pose"]
+                self.pose_list.append(pose)
                 if len(self.pose_list) > 3:
                     _ = self.pose_list.pop(0)
                 self.poses = np.array(self.pose_list, dtype=np.float32)
+            if "dist_R" in message:
+                dist = message["dist_R"]
+                if dist < 2000:
+                    point = pt_coords(pose, dist/1000, 'R')
+                    self.pnts_detected.append(point)
+                self.points = np.array(self.pnts_detected, dtype=np.float32)
 
     def draw(self):
         self.axes.clear()
@@ -49,6 +58,8 @@ class RobotDisplay:
                 )
         if self.poses is not None:
             self.axes.scatter(self.poses[:,0], self.poses[:,1], color="blue")
+        if self.points is not None:
+            self.axes.scatter(self.points[:,0], self.points[:,1], color="red")
 
     async def send_command(self, command):
         request = (json.dumps({"command": command})  ).encode()

@@ -47,4 +47,5 @@
 ![PicoBot electronics](imgs/picobot_electronics.jpg)
 * Added forwaard looking VCSEL distance sensor
 ![PicoBot w/ all 3 distance sensors](imgs/with_fwd_dist_sensor.jpg)
+![Right sensor values plotted](imgs/sensor-values-plotted.png)
 
