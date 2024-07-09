@@ -44,8 +44,17 @@
 * With the addition of 2 BLE UART Friend modules and multiple sensors sending data on I2C, an I2C multiplexer has also been added.
 * A full size breadboard is needed to hold everything.
 * Took the opportunity to put the right and left VCSEL distance sensors directly above the wheels.
+
 ![PicoBot electronics](imgs/picobot_electronics.jpg)
-* Added forwaard looking VCSEL distance sensor
+* Added forward looking VCSEL distance sensor
+
 ![PicoBot w/ all 3 distance sensors](imgs/with_fwd_dist_sensor.jpg)
+
+### Plotting points detected by distance sensors
+* Use vector addition to calculate detected points
+
+![Vector Addition](imgs/vector-addition.jpg)
+* Plot of points detected by right sensor
+
 ![Right sensor values plotted](imgs/sensor-values-plotted.png)
 
