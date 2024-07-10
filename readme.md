@@ -50,11 +50,17 @@
 
 ![PicoBot w/ all 3 distance sensors](imgs/with_fwd_dist_sensor.jpg)
 
-### Plotting points detected by distance sensors
 * Use vector addition to calculate detected points
 
 ![Vector Addition](imgs/vector-addition.jpg)
-* Plot of points detected by right sensor
 
-![Right sensor values plotted](imgs/sensor-values-plotted.png)
+### Customize arena and plot points detected by distance sensors
+* Starting at origin of arena with pose = (0, 0, 0)
+![Starting at Home](imgs/run1_start.png)
+
+* Run No. 1 
+    * Begin driving (in Tele-Op mode) CCW around arena perimeter
+    * plotting only points detected by right distance sensor
+
+![Run #1](imgs/run1a.png)
 
