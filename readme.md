@@ -60,7 +60,14 @@
 
 * Run No. 1 
     * Begin driving (in Tele-Op mode) CCW around arena perimeter
-    * plotting only points detected by right distance sensor
+    * plotting only points detected by right distance sensor (in red)
 
 ![Run #1](imgs/run1a.png)
+
+* Run No. 2 plotting distance values (+ offset) from all 3 sensors 
+    * Left -> RED
+    * Right -> GREEN
+    * Front -> YELLOW
+
+![Run #2](imgs/run2.png)
 

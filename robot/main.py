@@ -5,7 +5,7 @@ MicroPython code for PicoBot project w/ 2 BLE UART Friend modules
 * Robot data sent out to laptop on uart1
 * Raspberry Pi Pico mounted on differential drive robot
 * 56:1 gear motors with encoders
-* 2 VL53L0X tof distance sensors
+* 3 VL53L0X tof distance sensors
 * BNO055 IMU
 """
 import asyncio

@@ -7,6 +7,10 @@ from matplotlib.widgets import Button
 from geom2d import pt_coords
 from robot_ble_connection import BleConnection
 
+# Offset between sensor value and actual distance to robot center
+R_OFFSET = -14
+L_OFFSET = -5
+F_OFFSET = 33
 
 class RobotDisplay:
     def __init__(self):
@@ -17,8 +21,12 @@ class RobotDisplay:
         self.fig, self.axes = plt.subplots()
         self.pose_list = []
         self.poses = None
-        self.pnts_detected = []
-        self.points = None
+        self.r_pnts_list = []
+        self.r_pnts = None
+        self.l_pnts_list = []
+        self.l_pnts = None
+        self.f_pnts_list = []
+        self.f_pnts = None
 
     def handle_close(self, _):
         self.closed = True
@@ -43,11 +51,23 @@ class RobotDisplay:
                     _ = self.pose_list.pop(0)
                 self.poses = np.array(self.pose_list, dtype=np.float32)
             if "dist_R" in message:
-                dist = message["dist_R"]
-                if dist < 2000:
-                    point = pt_coords(pose, dist/1000, 'R')
-                    self.pnts_detected.append(point)
-                self.points = np.array(self.pnts_detected, dtype=np.float32)
+                r_dist = message["dist_R"] + R_OFFSET
+                if r_dist < 2000:
+                    r_point = pt_coords(pose, r_dist/1000, 'R')
+                    self.r_pnts_list.append(r_point)
+                self.r_pnts = np.array(self.r_pnts_list, dtype=np.float32)
+            if "dist_L" in message:
+                l_dist = message["dist_L"] + L_OFFSET
+                if l_dist < 2000:
+                    l_point = pt_coords(pose, l_dist/1000, 'L')
+                    self.l_pnts_list.append(l_point)
+                    self.l_pnts = np.array(self.l_pnts_list, dtype=np.float32)
+            if "dist_F" in message:
+                f_dist = message["dist_F"] + F_OFFSET
+                if f_dist < 2000:
+                    f_point = pt_coords(pose, f_dist/1000, 'F')
+                    self.f_pnts_list.append(f_point)
+                    self.f_pnts = np.array(self.f_pnts_list, dtype=np.float32)
 
     def draw(self):
         self.axes.clear()
@@ -58,8 +78,13 @@ class RobotDisplay:
                 )
         if self.poses is not None:
             self.axes.scatter(self.poses[:,0], self.poses[:,1], color="blue")
-        if self.points is not None:
-            self.axes.scatter(self.points[:,0], self.points[:,1], color="red")
+        if self.r_pnts is not None:
+            self.axes.scatter(self.r_pnts[:,0], self.r_pnts[:,1], color="green")
+        if self.l_pnts is not None:
+            self.axes.scatter(self.l_pnts[:,0], self.l_pnts[:,1], color="red")
+        if self.f_pnts is not None:
+            self.axes.scatter(self.f_pnts[:,0], self.f_pnts[:,1], color="yellow")
+        
 
     async def send_command(self, command):
         request = (json.dumps({"command": command})  ).encode()
