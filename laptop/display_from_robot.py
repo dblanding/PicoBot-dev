@@ -55,7 +55,7 @@ class RobotDisplay:
                 if r_dist < 2000:
                     r_point = pt_coords(pose, r_dist/1000, 'R')
                     self.r_pnts_list.append(r_point)
-                self.r_pnts = np.array(self.r_pnts_list, dtype=np.float32)
+                    self.r_pnts = np.array(self.r_pnts_list, dtype=np.float32)
             if "dist_L" in message:
                 l_dist = message["dist_L"] + L_OFFSET
                 if l_dist < 2000:
@@ -94,14 +94,19 @@ class RobotDisplay:
     def start(self, _):
         self.button_task = asyncio.create_task(self.send_command("start"))
 
+    def stop(self, _):
+        self.button_task = asyncio.create_task(self.send_command("stop"))
+
     async def main(self):
         plt.ion()
         await self.ble_connection.connect()
         try:
             await self.send_command("arena")
             self.fig.canvas.mpl_connect("close_event", self.handle_close)
-            start_button = Button(plt.axes([0.7, 0.05, 0.1, 0.075]), "Start")
+            start_button = Button(plt.axes([0.6, 0.05, 0.1, 0.075]), "Start")
             start_button.on_clicked(self.start)
+            stop_button = Button(plt.axes([0.8, 0.05, 0.1, 0.075]), "Stop")
+            stop_button.on_clicked(self.stop)
             while not self.closed:
                 self.draw()
                 plt.draw()

@@ -12,7 +12,7 @@ import asyncio
 import encoder_rp2 as encoder
 import gc
 import json
-import math
+from math import pi
 from machine import I2C, Pin, UART
 import motors
 from odometer import Odometer
@@ -88,25 +88,34 @@ class Robot():
         # set up some starting values
         self.lin_spd = 0
         self.ang_spd = 0
+        self.pose = (0, 0, 0)
+        self.run = True
+        self.mode = 0
+
+    def stop(self):
+        self.run = False
+        motors.drive_motors(0.0, 0.0)
 
     async def main(self):
         try:
-            while True:
+            while self.run:
 
                 # get IMU data
-                heading, *rest = imu.euler()
+                *_, gz = imu.gyro()  # deg/sec (+ turning left)
+                heading, *_ = imu.euler()  # deg
                 heading = - heading  # match sense of pose angle
-                yaw = heading * math.pi / 180  # convert to radians
+                yaw = heading * pi / 180  # convert to radians
 
                 # match pose angle numerically
-                if yaw < -math.pi:
-                    yaw += 2 * math.pi
+                if yaw < -pi:
+                    yaw += 2 * pi
 
                 # read distances from VCSEL sensors
                 dist_L = get_dist(b'\x02')
                 dist_R = get_dist(b'\x04')
                 dist_F = tof1.read()
-    
+
+                """
                 # Check for tele-op commands
                 if uart0.any() > 0:
                     try:
@@ -124,6 +133,28 @@ class Robot():
 
                     # send commands to motors
                     motors.drive_motors(self.lin_spd, self.ang_spd)
+                """
+
+                # Drive in a raster pattern
+                if self.mode == 0:
+                    # initial 90 deg turn to right
+                    self.lin_spd = 0
+                    self.ang_spd = -0.6
+                    motors.drive_motors(self.lin_spd, self.ang_spd)
+                    if yaw < -pi/2:
+                        motors.drive_motors(0, 0)
+                        self.mode = 1
+                        await asyncio.sleep(0.5)
+                elif self.mode == 1:
+                    # drive out
+                    # Steer to target yaw value = -pi/2
+                    self.lin_spd = 0.4
+                    yaw_err = -(yaw + pi/2)  # + values turn left
+                    self.ang_spd = yaw_err * 0.5
+                    motors.drive_motors(self.lin_spd, self.ang_spd)
+                    if dist_F < 500:
+                        self.mode = 2
+                        motors.drive_motors(0, 0)
 
                 # get current pose
                 pose = odom.update(enc_a.value(), enc_b.value())
@@ -148,7 +179,8 @@ class Robot():
 
 async def command_handler(robot):
     print("Starting handler")
-    robot_task = asyncio.create_task(robot.main())
+    robot_task = None
+    # robot_task = asyncio.create_task(robot.main())
     while True:
         if uart1.any():
             request = read_json()
@@ -157,6 +189,11 @@ async def command_handler(robot):
             print("Received: ", request)
             if request["command"] == "arena":
                 send_json({"arena": arena.boundary_lines,})
+            elif request["command"] == "start":
+                if not robot_task:
+                    robot_task = asyncio.create_task(robot.main())
+            elif request["command"] == "stop":
+                robot.stop()
 
         await asyncio.sleep(0.1)
 

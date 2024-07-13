@@ -71,3 +71,13 @@
 
 ![Run #2](imgs/run2.png)
 
+### Instead of Tele-Op, program robot to drive a raster pattern
+* Rotate arena axis 90 degrees
+* Use Start button to launch
+* Add Stop button
+* Initially:
+    * Turn right 90 degrees
+    * Then drive straight *OUT* and stop.
+
+![Run3](imgs/run3.png)
+
