@@ -16,11 +16,13 @@ from math import pi
 from machine import I2C, Pin, UART
 import motors
 from odometer import Odometer
-from parameters import JS_GAIN
+from parameters import JS_GAIN, ANGLE_TOL
 import struct
 from bno055 import BNO055
 import VL53L0X
 import arena
+
+RASTER_PITCH = 0.5  # meters
 
 # set up uart0 for communication with BLE UART friend
 print("setting up uart0 for accepting tele-op joystick commands")
@@ -88,7 +90,6 @@ class Robot():
         # set up some starting values
         self.lin_spd = 0
         self.ang_spd = 0
-        self.pose = (0, 0, 0)
         self.run = True
         self.mode = 0
 
@@ -115,50 +116,107 @@ class Robot():
                 dist_R = get_dist(b'\x04')
                 dist_F = tof1.read()
 
-                """
-                # Check for tele-op commands
-                if uart0.any() > 0:
-                    try:
-                        # get Bluetooth command
-                        bytestring = uart0.readline()
-                        data_type = bytestring[:2].decode()
-                        bin_value = bytestring[2:14]
-                        if data_type == '!A':  # accelerometer data
-                            x, y, z = struct.unpack('3f', bin_value)
-                            self.lin_spd = y * JS_GAIN
-                            self.ang_spd = -x * JS_GAIN
-                    except Exception as e:
-                        self.lin_spd, self.ang_spd = 0, 0
-                        print(e)
-
-                    # send commands to motors
-                    motors.drive_motors(self.lin_spd, self.ang_spd)
-                """
+                # get current pose
+                pose = odom.update(enc_a.value(), enc_b.value())
+                print(pose, yaw, dist_L, dist_R, dist_F)
 
                 # Drive in a raster pattern
                 if self.mode == 0:
                     # initial 90 deg turn to right
-                    self.lin_spd = 0
-                    self.ang_spd = -0.6
-                    motors.drive_motors(self.lin_spd, self.ang_spd)
-                    if yaw < -pi/2:
+                    # ignore distance values while turning
+                    dist_L = 2000
+                    dist_R = 2000
+                    dist_F = 2000
+                    goal_angle = -pi/2
+                    if yaw > (goal_angle + ANGLE_TOL):
+                        motors.drive_motors(0, -0.6)
+                    elif yaw < (goal_angle - ANGLE_TOL):
+                        motors.drive_motors(0, 0.6)
+                    else:
                         motors.drive_motors(0, 0)
                         self.mode = 1
-                        await asyncio.sleep(0.5)
                 elif self.mode == 1:
-                    # drive out
-                    # Steer to target yaw value = -pi/2
+                    # drive out, steering to goal angle
                     self.lin_spd = 0.4
-                    yaw_err = -(yaw + pi/2)  # + values turn left
-                    self.ang_spd = yaw_err * 0.5
+                    kp = -(yaw - goal_angle)  # proportional term
+                    kd = -(gz * 0.005)  # derivative term
+                    self.ang_spd = kp + kd
                     motors.drive_motors(self.lin_spd, self.ang_spd)
                     if dist_F < 500:
                         self.mode = 2
                         motors.drive_motors(0, 0)
-
-                # get current pose
-                pose = odom.update(enc_a.value(), enc_b.value())
-                print(pose, yaw, dist_L, dist_R, dist_F)
+                elif self.mode == 2:
+                    # turn 90 deg left
+                    # ignore distance values while turning
+                    dist_L = 2000
+                    # dist_R = 2000
+                    dist_F = 2000
+                    goal_angle = 0
+                    if yaw > (goal_angle + ANGLE_TOL):
+                        motors.drive_motors(0, -0.6)
+                    elif yaw < (goal_angle - ANGLE_TOL):
+                        motors.drive_motors(0, 0.6)
+                    else:
+                        motors.drive_motors(0, 0)
+                        self.mode = 3
+                        next_swath = pose[0] + RASTER_PITCH
+                elif self.mode == 3:
+                    # jog to next swath, steering to goal angle
+                    self.lin_spd = 0.4
+                    kp = -(yaw - goal_angle)  # proportional term
+                    kd = -(gz * 0.005)  # derivative term
+                    self.ang_spd = kp + kd
+                    motors.drive_motors(self.lin_spd, self.ang_spd)
+                    if pose[0] > next_swath:
+                        self.mode = 4
+                        motors.drive_motors(0, 0)
+                elif self.mode == 4:
+                    # turn 90 deg left
+                    goal_angle = pi/2
+                    if yaw > (goal_angle + ANGLE_TOL):
+                        motors.drive_motors(0, -0.6)
+                    elif yaw < (goal_angle - ANGLE_TOL):
+                        motors.drive_motors(0, 0.6)
+                    else:
+                        motors.drive_motors(0, 0)
+                        self.mode = 5
+                        goal_angle = pi/2
+                elif self.mode == 5:
+                    # drive back, steering to goal angle
+                    self.lin_spd = 0.4
+                    kp = -(yaw - goal_angle)  # proportional term
+                    kd = -(gz * 0.005)  # derivative term
+                    self.ang_spd = kp + kd
+                    motors.drive_motors(self.lin_spd, self.ang_spd)
+                    if dist_F < 500:
+                        self.mode = 6
+                        motors.drive_motors(0, 0)
+                elif self.mode == 6:
+                    # turn right 90 deg
+                    # ignore distance values while turning
+                    dist_L = 2000
+                    dist_R = 2000
+                    dist_F = 2000
+                    goal_angle = 0
+                    if yaw > (goal_angle + ANGLE_TOL):
+                        motors.drive_motors(0, -0.6)
+                    elif yaw < (goal_angle - ANGLE_TOL):
+                        motors.drive_motors(0, 0.6)
+                    else:
+                        motors.drive_motors(0, 0)
+                        self.mode = 7
+                        next_swath = pose[0] + RASTER_PITCH
+                elif self.mode == 7:
+                    # jog to next swath, steering to goal angle
+                    self.lin_spd = 0.4
+                    kp = -(yaw - goal_angle)  # proportional term
+                    kd = -(gz * 0.005)  # derivative term
+                    self.ang_spd = kp + kd
+                    motors.drive_motors(self.lin_spd, self.ang_spd)
+                    if pose[0] > next_swath:
+                        self.mode = 0
+                        motors.drive_motors(0, 0)
+                
 
                 # send robot data to laptop
                 if pose != (0, 0, 0):

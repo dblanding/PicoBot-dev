@@ -75,9 +75,11 @@
 * Rotate arena axis 90 degrees
 * Use Start button to launch
 * Add Stop button
-* Initially:
+* Initially, robot is at pose (0, 0, 0) (aimed to the right)
     * Turn right 90 degrees
-    * Then drive straight *OUT* and stop.
+    * Then drive *DOWN*
+    * then jog *OVER* to the right 1/2 m
+    * then *Up*
 
-![Run3](imgs/run3.png)
+![raster-run](imgs/raster-run1.png)
 

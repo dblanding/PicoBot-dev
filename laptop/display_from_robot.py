@@ -52,19 +52,19 @@ class RobotDisplay:
                 self.poses = np.array(self.pose_list, dtype=np.float32)
             if "dist_R" in message:
                 r_dist = message["dist_R"] + R_OFFSET
-                if r_dist < 2000:
+                if r_dist < 1500:
                     r_point = pt_coords(pose, r_dist/1000, 'R')
                     self.r_pnts_list.append(r_point)
                     self.r_pnts = np.array(self.r_pnts_list, dtype=np.float32)
             if "dist_L" in message:
                 l_dist = message["dist_L"] + L_OFFSET
-                if l_dist < 2000:
+                if l_dist < 1500:
                     l_point = pt_coords(pose, l_dist/1000, 'L')
                     self.l_pnts_list.append(l_point)
                     self.l_pnts = np.array(self.l_pnts_list, dtype=np.float32)
             if "dist_F" in message:
                 f_dist = message["dist_F"] + F_OFFSET
-                if f_dist < 2000:
+                if f_dist < 1500:
                     f_point = pt_coords(pose, f_dist/1000, 'F')
                     self.f_pnts_list.append(f_point)
                     self.f_pnts = np.array(self.f_pnts_list, dtype=np.float32)
