@@ -22,7 +22,7 @@ from bno055 import BNO055
 import VL53L0X
 import arena
 
-RASTER_PITCH = 0.5  # meters
+SWATH_PITCH = 0.5  # line spacing (m) of parallel line pattern
 
 # set up uart0 for communication with BLE UART friend
 print("setting up uart0 for accepting tele-op joystick commands")
@@ -120,7 +120,7 @@ class Robot():
                 pose = odom.update(enc_a.value(), enc_b.value())
                 print(pose, yaw, dist_L, dist_R, dist_F)
 
-                # Drive in a raster pattern
+                # Drive in a back & forth parallel line pattern
                 if self.mode == 0:
                     # initial 90 deg turn to right
                     # ignore distance values while turning
@@ -136,15 +136,18 @@ class Robot():
                         motors.drive_motors(0, 0)
                         self.mode = 1
                 elif self.mode == 1:
-                    # drive out, steering to goal angle
+                    # drive -y direction, steering to goal angle
                     self.lin_spd = 0.4
                     kp = -(yaw - goal_angle)  # proportional term
                     kd = -(gz * 0.005)  # derivative term
                     self.ang_spd = kp + kd
                     motors.drive_motors(self.lin_spd, self.ang_spd)
                     if dist_F < 500:
-                        self.mode = 2
                         motors.drive_motors(0, 0)
+                        # sync pose angle to yaw value
+                        await asyncio.sleep(0.1)
+                        odom.set_angle(yaw)
+                        self.mode = 2
                 elif self.mode == 2:
                     # turn 90 deg left
                     # ignore distance values while turning
@@ -159,9 +162,9 @@ class Robot():
                     else:
                         motors.drive_motors(0, 0)
                         self.mode = 3
-                        next_swath = pose[0] + RASTER_PITCH
+                        next_swath = pose[0] + SWATH_PITCH
                 elif self.mode == 3:
-                    # jog to next swath, steering to goal angle
+                    # jog +x to next swath, steering to goal angle
                     self.lin_spd = 0.4
                     kp = -(yaw - goal_angle)  # proportional term
                     kd = -(gz * 0.005)  # derivative term
@@ -182,15 +185,18 @@ class Robot():
                         self.mode = 5
                         goal_angle = pi/2
                 elif self.mode == 5:
-                    # drive back, steering to goal angle
+                    # drive +y direction, steering to goal angle
                     self.lin_spd = 0.4
                     kp = -(yaw - goal_angle)  # proportional term
                     kd = -(gz * 0.005)  # derivative term
                     self.ang_spd = kp + kd
                     motors.drive_motors(self.lin_spd, self.ang_spd)
                     if dist_F < 500:
-                        self.mode = 6
                         motors.drive_motors(0, 0)
+                        # sync pose angle to yaw value
+                        await asyncio.sleep(0.1)
+                        odom.set_angle(yaw)
+                        self.mode = 6
                 elif self.mode == 6:
                     # turn right 90 deg
                     # ignore distance values while turning
@@ -205,18 +211,17 @@ class Robot():
                     else:
                         motors.drive_motors(0, 0)
                         self.mode = 7
-                        next_swath = pose[0] + RASTER_PITCH
+                        next_swath = pose[0] + SWATH_PITCH
                 elif self.mode == 7:
-                    # jog to next swath, steering to goal angle
+                    # jog +x to next swath, steering to goal angle
                     self.lin_spd = 0.4
                     kp = -(yaw - goal_angle)  # proportional term
                     kd = -(gz * 0.005)  # derivative term
                     self.ang_spd = kp + kd
                     motors.drive_motors(self.lin_spd, self.ang_spd)
                     if pose[0] > next_swath:
-                        self.mode = 0
                         motors.drive_motors(0, 0)
-                
+                        self.mode = 0
 
                 # send robot data to laptop
                 if pose != (0, 0, 0):

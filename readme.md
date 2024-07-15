@@ -83,3 +83,9 @@
 
 ![Raster Run](imgs/raster_run2.png)
 
+* Add set_angle method to Odometer to allow correction of pose angle
+* Sync pose angle to yaw angle at end of each Y-direction leg
+
+![Raster Run](imgs/raster_run5.png)
+
+

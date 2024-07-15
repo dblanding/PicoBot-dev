@@ -19,6 +19,10 @@ class Odometer():
         self.prev_enc_a_val = 0
         self.prev_enc_b_val = 0
 
+    def set_angle(self, new_angle):
+        """Use to adjust or correct pose angle (radians)"""
+        self.ang = new_angle
+
     def update(self, enc_a_val, enc_b_val):
         """
         Update current pose by incrementing from previous pose
