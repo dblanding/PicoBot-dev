@@ -81,5 +81,5 @@
     * then jog *OVER* to the right 1/2 m
     * then *Up*
 
-![raster-run](imgs/raster-run1.png)
+![Raster Run](imgs/raster_run2.png)
 

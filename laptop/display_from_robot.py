@@ -47,8 +47,6 @@ class RobotDisplay:
             if "pose" in message:
                 pose = message["pose"]
                 self.pose_list.append(pose)
-                if len(self.pose_list) > 3:
-                    _ = self.pose_list.pop(0)
                 self.poses = np.array(self.pose_list, dtype=np.float32)
             if "dist_R" in message:
                 r_dist = message["dist_R"] + R_OFFSET
