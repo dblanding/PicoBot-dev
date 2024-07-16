@@ -18,11 +18,11 @@ import motors
 from odometer import Odometer
 from parameters import JS_GAIN, ANGLE_TOL
 import struct
-from bno055 import BNO055
+from bno08x_i2c import *
 import VL53L0X
 import arena
 
-SWATH_PITCH = 0.5  # line spacing (m) of parallel line pattern
+SWATH_PITCH = 0.45  # line spacing (m) of parallel line pattern
 
 # set up uart0 for communication with BLE UART friend
 print("setting up uart0 for accepting tele-op joystick commands")
@@ -48,10 +48,14 @@ odom = Odometer()
 # set up multiplexer on i2c0
 i2c0 = I2C(0, sda=Pin(12), scl=Pin(13))
 
-# set up IMU on i2c1
-i2c1 = I2C(1, sda=Pin(14), scl=Pin(15))
-print(i2c1.scan())
-imu = BNO055(i2c1)
+# set up BNO08x IMU on i2c1
+i2c1 = I2C(1, scl=Pin(15), sda=Pin(14), freq=100000, timeout=200000 )
+print("I2C Device found at address : ",i2c1.scan(),"\n")
+bno = BNO08X_I2C(i2c1, debug=False)
+bno.enable_feature(BNO_REPORT_ACCELEROMETER)
+#bno.enable_feature(BNO_REPORT_MAGNETOMETER)
+bno.enable_feature(BNO_REPORT_GYROSCOPE)
+bno.enable_feature(BNO_REPORT_ROTATION_VECTOR)
 
 # set up forward looking dist sensor on i2c1
 tof1 = VL53L0X.VL53L0X(i2c1)
@@ -102,9 +106,10 @@ class Robot():
             while self.run:
 
                 # get IMU data
-                *_, gz = imu.gyro()  # deg/sec (+ turning left)
-                heading, *_ = imu.euler()  # deg
-                heading = - heading  # match sense of pose angle
+                *_, gz = bno.gyro  # rad/sec (+ turning left)
+                gz *= (180/pi)  # deg/sec
+                *_, heading = bno.euler  # deg
+                #heading = - heading  # match sense of pose angle
                 yaw = heading * pi / 180  # convert to radians
 
                 # match pose angle numerically
@@ -134,6 +139,11 @@ class Robot():
                         motors.drive_motors(0, 0.6)
                     else:
                         motors.drive_motors(0, 0)
+                        '''
+                        # sync pose angle to yaw value
+                        await asyncio.sleep(0.1)
+                        odom.set_angle(yaw)
+                        '''
                         self.mode = 1
                 elif self.mode == 1:
                     # drive -y direction, steering to goal angle
@@ -144,9 +154,6 @@ class Robot():
                     motors.drive_motors(self.lin_spd, self.ang_spd)
                     if dist_F < 500:
                         motors.drive_motors(0, 0)
-                        # sync pose angle to yaw value
-                        await asyncio.sleep(0.1)
-                        odom.set_angle(yaw)
                         self.mode = 2
                 elif self.mode == 2:
                     # turn 90 deg left
@@ -182,6 +189,11 @@ class Robot():
                         motors.drive_motors(0, 0.6)
                     else:
                         motors.drive_motors(0, 0)
+                        '''
+                        # sync pose angle to yaw value
+                        await asyncio.sleep(0.1)
+                        odom.set_angle(yaw)
+                        '''
                         self.mode = 5
                         goal_angle = pi/2
                 elif self.mode == 5:
@@ -193,9 +205,6 @@ class Robot():
                     motors.drive_motors(self.lin_spd, self.ang_spd)
                     if dist_F < 500:
                         motors.drive_motors(0, 0)
-                        # sync pose angle to yaw value
-                        await asyncio.sleep(0.1)
-                        odom.set_angle(yaw)
                         self.mode = 6
                 elif self.mode == 6:
                     # turn right 90 deg
