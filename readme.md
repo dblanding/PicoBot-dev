@@ -88,4 +88,12 @@
 
 ![Raster Run](imgs/raster_run5.png)
 
+* Use pose_angle (instead of yaw) for driving feedback on turns and straights.
+    * Noticably reduced oscillation / hunting
+    * pose track of legs decidedly straighter, corners squarer
+* Added function `get_imu_data()`
+* Sync pose_angle to yaw just prior to driving Y-direction legs of pattern
+* But entire pattern has a noticable CW rotation 
+
+![Raster map using pose_angle feedback](imgs/rr13.png)
 

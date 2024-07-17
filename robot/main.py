@@ -75,6 +75,18 @@ def get_dist(channel):
     tof.stop()
     return dist
 
+def get_imu_data():
+    """get & return yaw and gyro_z data from IMU"""
+    *_, gz = bno.gyro  # rad/sec (+ turning left)
+    gz *= (180/pi)  # deg/sec
+    *_, heading = bno.euler  # deg
+    #heading = - heading  # match sense of pose angle
+    yaw = heading * pi / 180  # convert to radians
+    # match pose angle numerically
+    if yaw < -pi:
+        yaw += 2 * pi
+    return yaw, gz
+
 def send_json(data):
     uart1.write((json.dumps(data) + "\n").encode())
 
@@ -106,15 +118,7 @@ class Robot():
             while self.run:
 
                 # get IMU data
-                *_, gz = bno.gyro  # rad/sec (+ turning left)
-                gz *= (180/pi)  # deg/sec
-                *_, heading = bno.euler  # deg
-                #heading = - heading  # match sense of pose angle
-                yaw = heading * pi / 180  # convert to radians
-
-                # match pose angle numerically
-                if yaw < -pi:
-                    yaw += 2 * pi
+                yaw, gz = get_imu_data()
 
                 # read distances from VCSEL sensors
                 dist_L = get_dist(b'\x02')
@@ -123,32 +127,34 @@ class Robot():
 
                 # get current pose
                 pose = odom.update(enc_a.value(), enc_b.value())
-                print(pose, yaw, dist_L, dist_R, dist_F)
+                pose_ang = pose[2]
 
                 # Drive in a back & forth parallel line pattern
                 if self.mode == 0:
                     # initial 90 deg turn to right
-                    # ignore distance values while turning
+                    # suppress distance values while turning
                     dist_L = 2000
                     dist_R = 2000
                     dist_F = 2000
                     goal_angle = -pi/2
-                    if yaw > (goal_angle + ANGLE_TOL):
+                    if pose_ang > (goal_angle + ANGLE_TOL):
                         motors.drive_motors(0, -0.6)
-                    elif yaw < (goal_angle - ANGLE_TOL):
+                    elif pose_ang < (goal_angle - ANGLE_TOL):
                         motors.drive_motors(0, 0.6)
                     else:
                         motors.drive_motors(0, 0)
-                        '''
+                        
                         # sync pose angle to yaw value
-                        await asyncio.sleep(0.1)
+                        await asyncio.sleep(2.0)
+                        # get a fresh yaw value
+                        yaw, gz = get_imu_data()
                         odom.set_angle(yaw)
-                        '''
+                        
                         self.mode = 1
                 elif self.mode == 1:
                     # drive -y direction, steering to goal angle
                     self.lin_spd = 0.4
-                    kp = -(yaw - goal_angle)  # proportional term
+                    kp = -(pose_ang - goal_angle)  # proportional term
                     kd = -(gz * 0.005)  # derivative term
                     self.ang_spd = kp + kd
                     motors.drive_motors(self.lin_spd, self.ang_spd)
@@ -157,14 +163,14 @@ class Robot():
                         self.mode = 2
                 elif self.mode == 2:
                     # turn 90 deg left
-                    # ignore distance values while turning
+                    # suppress distance values while turning
                     dist_L = 2000
                     # dist_R = 2000
                     dist_F = 2000
                     goal_angle = 0
-                    if yaw > (goal_angle + ANGLE_TOL):
+                    if pose_ang > (goal_angle + ANGLE_TOL):
                         motors.drive_motors(0, -0.6)
-                    elif yaw < (goal_angle - ANGLE_TOL):
+                    elif pose_ang < (goal_angle - ANGLE_TOL):
                         motors.drive_motors(0, 0.6)
                     else:
                         motors.drive_motors(0, 0)
@@ -173,7 +179,7 @@ class Robot():
                 elif self.mode == 3:
                     # jog +x to next swath, steering to goal angle
                     self.lin_spd = 0.4
-                    kp = -(yaw - goal_angle)  # proportional term
+                    kp = -(pose_ang - goal_angle)  # proportional term
                     kd = -(gz * 0.005)  # derivative term
                     self.ang_spd = kp + kd
                     motors.drive_motors(self.lin_spd, self.ang_spd)
@@ -183,23 +189,25 @@ class Robot():
                 elif self.mode == 4:
                     # turn 90 deg left
                     goal_angle = pi/2
-                    if yaw > (goal_angle + ANGLE_TOL):
+                    if pose_ang > (goal_angle + ANGLE_TOL):
                         motors.drive_motors(0, -0.6)
-                    elif yaw < (goal_angle - ANGLE_TOL):
+                    elif pose_ang < (goal_angle - ANGLE_TOL):
                         motors.drive_motors(0, 0.6)
                     else:
                         motors.drive_motors(0, 0)
-                        '''
+                        
                         # sync pose angle to yaw value
-                        await asyncio.sleep(0.1)
+                        await asyncio.sleep(2.0)
+                        # get a fresh yaw value
+                        yaw, gz = get_imu_data()
                         odom.set_angle(yaw)
-                        '''
+                        
                         self.mode = 5
                         goal_angle = pi/2
                 elif self.mode == 5:
                     # drive +y direction, steering to goal angle
                     self.lin_spd = 0.4
-                    kp = -(yaw - goal_angle)  # proportional term
+                    kp = -(pose_ang - goal_angle)  # proportional term
                     kd = -(gz * 0.005)  # derivative term
                     self.ang_spd = kp + kd
                     motors.drive_motors(self.lin_spd, self.ang_spd)
@@ -208,14 +216,14 @@ class Robot():
                         self.mode = 6
                 elif self.mode == 6:
                     # turn right 90 deg
-                    # ignore distance values while turning
+                    # suppress distance values while turning
                     dist_L = 2000
                     dist_R = 2000
                     dist_F = 2000
                     goal_angle = 0
-                    if yaw > (goal_angle + ANGLE_TOL):
+                    if pose_ang > (goal_angle + ANGLE_TOL):
                         motors.drive_motors(0, -0.6)
-                    elif yaw < (goal_angle - ANGLE_TOL):
+                    elif pose_ang < (goal_angle - ANGLE_TOL):
                         motors.drive_motors(0, 0.6)
                     else:
                         motors.drive_motors(0, 0)
@@ -224,7 +232,7 @@ class Robot():
                 elif self.mode == 7:
                     # jog +x to next swath, steering to goal angle
                     self.lin_spd = 0.4
-                    kp = -(yaw - goal_angle)  # proportional term
+                    kp = -(pose_ang - goal_angle)  # proportional term
                     kd = -(gz * 0.005)  # derivative term
                     self.ang_spd = kp + kd
                     motors.drive_motors(self.lin_spd, self.ang_spd)
