@@ -9,8 +9,8 @@ MicroPython code for PicoBot project w/ 2 BLE UART Friend modules
 * BNO08x IMU
 
 Notes on angular units:
-Use radians. pose_angle (from odometer) and yaw (from IMU)
-are in radians, starting from 0 at the X axis, pos CCW / neg CW
+Use radians: pose_angle (from odometer) and yaw (from IMU)
+0 at the X axis (initially straight ahead), pos CCW / neg CW
 """
 import asyncio
 import encoder_rp2 as encoder
@@ -25,6 +25,8 @@ import struct
 from bno08x_i2c import *
 import VL53L0X
 import arena
+
+D_GAIN = 0.286  # Gain of Derivative feedback term
 
 # set up uart0 for communication with BLE UART friend
 print("setting up uart0 for accepting tele-op joystick commands")
@@ -78,7 +80,7 @@ def get_dist(channel):
     return dist
 
 def get_imu_data():
-    """get & return yaw and gyro_z data from IMU"""
+    """return yaw and gyro_z data from IMU"""
     *_, gz = bno.gyro  # rad/sec (+ turning left)
     *_, heading = bno.euler  # deg
     yaw = heading * pi / 180  # convert to radians
@@ -127,8 +129,25 @@ class Robot():
 
                 # get current pose
                 pose = odom.update(enc_a.value(), enc_b.value())
-                pose_ang = pose[2]
-
+                # pose_ang = pose[2]
+                '''
+                # Just turn right 90 deg
+                goal_angle = -pi/2
+                if yaw > (goal_angle + ANGLE_TOL):
+                    motors.drive_motors(0, -0.6)
+                else:
+                    motors.drive_motors(0, 0)
+                
+                # Drive a single leg
+                goal_angle = 0
+                self.lin_spd = 0.4
+                kp = -(yaw - goal_angle)  # proportional term
+                kd = -(gz * D_GAIN)  # derivative term
+                self.ang_spd = kp + kd
+                motors.drive_motors(self.lin_spd, self.ang_spd)
+                if dist_F < 500:
+                    motors.drive_motors(0, 0)
+                '''
                 # Drive in a back & forth parallel line pattern
                 if self.mode == 0:
                     # initial 90 deg turn to right
@@ -137,9 +156,9 @@ class Robot():
                     dist_R = 2000
                     dist_F = 2000
                     goal_angle = -pi/2
-                    if pose_ang > (goal_angle + ANGLE_TOL):
+                    if yaw > (goal_angle + ANGLE_TOL):
                         motors.drive_motors(0, -0.6)
-                    elif pose_ang < (goal_angle - ANGLE_TOL):
+                    elif yaw < (goal_angle - ANGLE_TOL):
                         motors.drive_motors(0, 0.6)
                     else:
                         motors.drive_motors(0, 0)
@@ -154,8 +173,8 @@ class Robot():
                 elif self.mode == 1:
                     # drive -y direction, steering to goal angle
                     self.lin_spd = 0.4
-                    kp = -(pose_ang - goal_angle)  # proportional term
-                    kd = -(gz * 0.286)  # derivative term
+                    kp = -(yaw - goal_angle)  # proportional term
+                    kd = -(gz * D_GAIN)  # derivative term
                     self.ang_spd = kp + kd
                     motors.drive_motors(self.lin_spd, self.ang_spd)
                     if dist_F < 500:
@@ -168,9 +187,9 @@ class Robot():
                     dist_R = 2000
                     dist_F = 2000
                     goal_angle = 0
-                    if pose_ang > (goal_angle + ANGLE_TOL):
+                    if yaw > (goal_angle + ANGLE_TOL):
                         motors.drive_motors(0, -0.6)
-                    elif pose_ang < (goal_angle - ANGLE_TOL):
+                    elif yaw < (goal_angle - ANGLE_TOL):
                         motors.drive_motors(0, 0.6)
                     else:
                         motors.drive_motors(0, 0)
@@ -179,8 +198,8 @@ class Robot():
                 elif self.mode == 3:
                     # jog +x to next swath, steering to goal angle
                     self.lin_spd = 0.4
-                    kp = -(pose_ang - goal_angle)  # proportional term
-                    kd = -(gz * 0.005)  # derivative term
+                    kp = -(yaw - goal_angle)  # proportional term
+                    kd = -(gz * D_GAIN)  # derivative term
                     self.ang_spd = kp + kd
                     motors.drive_motors(self.lin_spd, self.ang_spd)
                     if pose[0] > next_swath:
@@ -193,9 +212,9 @@ class Robot():
                     dist_R = 2000
                     dist_F = 2000
                     goal_angle = pi/2
-                    if pose_ang > (goal_angle + ANGLE_TOL):
+                    if yaw > (goal_angle + ANGLE_TOL):
                         motors.drive_motors(0, -0.6)
-                    elif pose_ang < (goal_angle - ANGLE_TOL):
+                    elif yaw < (goal_angle - ANGLE_TOL):
                         motors.drive_motors(0, 0.6)
                     else:
                         motors.drive_motors(0, 0)
@@ -211,8 +230,8 @@ class Robot():
                 elif self.mode == 5:
                     # drive +y direction, steering to goal angle
                     self.lin_spd = 0.4
-                    kp = -(pose_ang - goal_angle)  # proportional term
-                    kd = -(gz * 0.005)  # derivative term
+                    kp = -(yaw - goal_angle)  # proportional term
+                    kd = -(gz * D_GAIN)  # derivative term
                     self.ang_spd = kp + kd
                     motors.drive_motors(self.lin_spd, self.ang_spd)
                     if dist_F < 500:
@@ -225,9 +244,9 @@ class Robot():
                     dist_R = 2000
                     dist_F = 2000
                     goal_angle = 0
-                    if pose_ang > (goal_angle + ANGLE_TOL):
+                    if yaw > (goal_angle + ANGLE_TOL):
                         motors.drive_motors(0, -0.6)
-                    elif pose_ang < (goal_angle - ANGLE_TOL):
+                    elif yaw < (goal_angle - ANGLE_TOL):
                         motors.drive_motors(0, 0.6)
                     else:
                         motors.drive_motors(0, 0)
@@ -236,8 +255,8 @@ class Robot():
                 elif self.mode == 7:
                     # jog +x to next swath, steering to goal angle
                     self.lin_spd = 0.4
-                    kp = -(pose_ang - goal_angle)  # proportional term
-                    kd = -(gz * 0.005)  # derivative term
+                    kp = -(yaw - goal_angle)  # proportional term
+                    kd = -(gz * D_GAIN)  # derivative term
                     self.ang_spd = kp + kd
                     motors.drive_motors(self.lin_spd, self.ang_spd)
                     if pose[0] > next_swath:

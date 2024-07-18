@@ -71,29 +71,18 @@
 
 ![Run #2](imgs/run2.png)
 
-### Instead of Tele-Op, program robot to drive a raster pattern
-* Rotate arena axis 90 degrees
-* Use Start button to launch
-* Add Stop button
-* Initially, robot is at pose (0, 0, 0) (aimed to the right)
-    * Turn right 90 degrees
-    * Then drive *DOWN*
-    * then jog *OVER* to the right 1/2 m
-    * then *Up*
+### Instead of Tele-Op, program robot to drive a Search & Rescue pattern
+* First, do a simple right turn and adjust TRACK_WIDTH until Odometer pose_angle agrees with IMU yaw angle
+* Next, drive a long straight leg with a goal_angle = 0 to make sure that pose_angle and yaw agree at the end of the leg.
+* Now set up the S&R pattern
+    * Rotate arena axis 90 degrees
+    * Use Start button to launch
+    * Add Stop button
+    * Initially, robot is at pose (0, 0, 0) (aimed to the right)
+    * Sync pose_angle to yaw just prior to driving Y-direction legs of pattern
 
-![Raster Run](imgs/raster_run2.png)
+![S&R pattern](imgs/s&r.png)
 
-* Add set_angle method to Odometer to allow correction of pose angle
-* Sync pose angle to yaw angle at end of each Y-direction leg
-
-![Raster Run](imgs/raster_run5.png)
-
-* Use pose_angle (instead of yaw) for driving feedback on turns and straights.
-    * Noticably reduced oscillation / hunting
-    * pose track of legs decidedly straighter, corners squarer
-* Added function `get_imu_data()`
-* Sync pose_angle to yaw just prior to driving Y-direction legs of pattern
-* But entire pattern has a noticable CW rotation 
-
-![Raster map using pose_angle feedback](imgs/rr13.png)
+* First 3 legs look OK but on the 4th leg (going +Y) something goes Kaflooie.
+    * Need to check [data](data/s&r_data.txt) to figure it out.
 
