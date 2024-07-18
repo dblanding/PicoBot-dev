@@ -1,8 +1,9 @@
 # parameters.py
 
 # car geometry
-TRACK_WIDTH = 0.1817  # meters
+TRACK_WIDTH = 0.17  # meters
 WHEEL_CIRC = 0.214  # meters
+SWATH_PITCH = 0.43  # line spacing (m) of parallel line pattern
 
 # encoder / gearbox
 TICKS_PER_REV = 2464

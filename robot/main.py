@@ -6,7 +6,11 @@ MicroPython code for PicoBot project w/ 2 BLE UART Friend modules
 * Raspberry Pi Pico mounted on differential drive robot
 * 56:1 gear motors with encoders
 * 3 VL53L0X tof distance sensors
-* BNO055 IMU
+* BNO08x IMU
+
+Notes on angular units:
+Use radians. pose_angle (from odometer) and yaw (from IMU)
+are in radians, starting from 0 at the X axis, pos CCW / neg CW
 """
 import asyncio
 import encoder_rp2 as encoder
@@ -16,13 +20,11 @@ from math import pi
 from machine import I2C, Pin, UART
 import motors
 from odometer import Odometer
-from parameters import JS_GAIN, ANGLE_TOL
+from parameters import JS_GAIN, ANGLE_TOL, SWATH_PITCH
 import struct
 from bno08x_i2c import *
 import VL53L0X
 import arena
-
-SWATH_PITCH = 0.45  # line spacing (m) of parallel line pattern
 
 # set up uart0 for communication with BLE UART friend
 print("setting up uart0 for accepting tele-op joystick commands")
@@ -49,7 +51,7 @@ odom = Odometer()
 i2c0 = I2C(0, sda=Pin(12), scl=Pin(13))
 
 # set up BNO08x IMU on i2c1
-i2c1 = I2C(1, scl=Pin(15), sda=Pin(14), freq=100000, timeout=200000 )
+i2c1 = I2C(1, sda=Pin(14), scl=Pin(15), freq=100000, timeout=200000 )
 print("I2C Device found at address : ",i2c1.scan(),"\n")
 bno = BNO08X_I2C(i2c1, debug=False)
 bno.enable_feature(BNO_REPORT_ACCELEROMETER)
@@ -78,9 +80,7 @@ def get_dist(channel):
 def get_imu_data():
     """get & return yaw and gyro_z data from IMU"""
     *_, gz = bno.gyro  # rad/sec (+ turning left)
-    gz *= (180/pi)  # deg/sec
     *_, heading = bno.euler  # deg
-    #heading = - heading  # match sense of pose angle
     yaw = heading * pi / 180  # convert to radians
     # match pose angle numerically
     if yaw < -pi:
@@ -145,7 +145,7 @@ class Robot():
                         motors.drive_motors(0, 0)
                         
                         # sync pose angle to yaw value
-                        await asyncio.sleep(2.0)
+                        await asyncio.sleep(1.0)
                         # get a fresh yaw value
                         yaw, gz = get_imu_data()
                         odom.set_angle(yaw)
@@ -155,7 +155,7 @@ class Robot():
                     # drive -y direction, steering to goal angle
                     self.lin_spd = 0.4
                     kp = -(pose_ang - goal_angle)  # proportional term
-                    kd = -(gz * 0.005)  # derivative term
+                    kd = -(gz * 0.286)  # derivative term
                     self.ang_spd = kp + kd
                     motors.drive_motors(self.lin_spd, self.ang_spd)
                     if dist_F < 500:
@@ -165,7 +165,7 @@ class Robot():
                     # turn 90 deg left
                     # suppress distance values while turning
                     dist_L = 2000
-                    # dist_R = 2000
+                    dist_R = 2000
                     dist_F = 2000
                     goal_angle = 0
                     if pose_ang > (goal_angle + ANGLE_TOL):
@@ -188,6 +188,10 @@ class Robot():
                         motors.drive_motors(0, 0)
                 elif self.mode == 4:
                     # turn 90 deg left
+                    # suppress distance values while turning
+                    dist_L = 2000
+                    dist_R = 2000
+                    dist_F = 2000
                     goal_angle = pi/2
                     if pose_ang > (goal_angle + ANGLE_TOL):
                         motors.drive_motors(0, -0.6)
@@ -197,7 +201,7 @@ class Robot():
                         motors.drive_motors(0, 0)
                         
                         # sync pose angle to yaw value
-                        await asyncio.sleep(2.0)
+                        await asyncio.sleep(1.0)
                         # get a fresh yaw value
                         yaw, gz = get_imu_data()
                         odom.set_angle(yaw)
