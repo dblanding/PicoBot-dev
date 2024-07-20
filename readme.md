@@ -73,16 +73,19 @@
 
 ### Instead of Tele-Op, program robot to drive a Search & Rescue pattern
 * First, do a simple right turn and adjust TRACK_WIDTH until Odometer pose_angle agrees with IMU yaw angle
-* Next, drive a long straight leg with a goal_angle = 0 to make sure that pose_angle and yaw agree at the end of the leg.
-* Now set up the S&R pattern
-    * Rotate arena axis 90 degrees
-    * Use Start button to launch
-    * Add Stop button
+* Next, drive a long straight leg with a goal_angle = 0 to make sure that pose_angle and yaw are nearly equal at the end of the leg.
+* Now we're ready to drive the S&R pattern
+    * Rotate arena axis 90 degrees from before
+    * Use Start button to start driving
+    * The Stop button to stop driving
     * Initially, robot is at pose (0, 0, 0) (aimed to the right)
-    * Sync pose_angle to yaw just prior to driving Y-direction legs of pattern
+    * Make an initial 90 deg turn to the right, then
+    * Sync pose_angle to yaw just prior to driving in the -Y direction
+    * Steer to a target angle
+        * using yaw error as Proportional feedback
+        * gyro-z as Derivative feedback
 
 ![S&R pattern](imgs/s&r.png)
 
-* First 3 legs look OK but on the 4th leg (going +Y) something goes Kaflooie.
-    * Need to check [data](data/s&r_data.txt) to figure it out.
+* Trip [data](data/s&r_data.txt) shows the record of the trip
 

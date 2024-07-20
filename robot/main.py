@@ -25,6 +25,7 @@ import struct
 from bno08x_i2c import *
 import VL53L0X
 import arena
+import time
 
 D_GAIN = 0.286  # Gain of Derivative feedback term
 
@@ -87,7 +88,16 @@ def get_imu_data():
     # match pose angle numerically
     if yaw < -pi:
         yaw += 2 * pi
-    return yaw, gz
+    return gz, yaw
+
+def sync_pose_ang_to_yaw():
+    gz, yaw = get_imu_data()
+    # Wait for value of gz to settle to near zero
+    while abs(gz) > .002: 
+        time.sleep(0.05)
+        gz, yaw = get_imu_data()
+    # yaw value should now be unchanging
+    odom.set_angle(yaw)
 
 def send_json(data):
     uart1.write((json.dumps(data) + "\n").encode())
@@ -120,7 +130,7 @@ class Robot():
             while self.run:
 
                 # get IMU data
-                yaw, gz = get_imu_data()
+                gz, yaw = get_imu_data()
 
                 # read distances from VCSEL sensors
                 dist_L = get_dist(b'\x02')
@@ -129,25 +139,7 @@ class Robot():
 
                 # get current pose
                 pose = odom.update(enc_a.value(), enc_b.value())
-                # pose_ang = pose[2]
-                '''
-                # Just turn right 90 deg
-                goal_angle = -pi/2
-                if yaw > (goal_angle + ANGLE_TOL):
-                    motors.drive_motors(0, -0.6)
-                else:
-                    motors.drive_motors(0, 0)
-                
-                # Drive a single leg
-                goal_angle = 0
-                self.lin_spd = 0.4
-                kp = -(yaw - goal_angle)  # proportional term
-                kd = -(gz * D_GAIN)  # derivative term
-                self.ang_spd = kp + kd
-                motors.drive_motors(self.lin_spd, self.ang_spd)
-                if dist_F < 500:
-                    motors.drive_motors(0, 0)
-                '''
+
                 # Drive in a back & forth parallel line pattern
                 if self.mode == 0:
                     # initial 90 deg turn to right
@@ -162,13 +154,9 @@ class Robot():
                         motors.drive_motors(0, 0.6)
                     else:
                         motors.drive_motors(0, 0)
-                        
-                        # sync pose angle to yaw value
-                        await asyncio.sleep(1.0)
-                        # get a fresh yaw value
-                        yaw, gz = get_imu_data()
-                        odom.set_angle(yaw)
-                        
+                        sync_pose_ang_to_yaw()
+                        gz, yaw = get_imu_data()
+                        pose = odom.update(enc_a.value(), enc_b.value())
                         self.mode = 1
                 elif self.mode == 1:
                     # drive -y direction, steering to goal angle
@@ -218,13 +206,7 @@ class Robot():
                         motors.drive_motors(0, 0.6)
                     else:
                         motors.drive_motors(0, 0)
-                        
-                        # sync pose angle to yaw value
-                        await asyncio.sleep(1.0)
-                        # get a fresh yaw value
-                        yaw, gz = get_imu_data()
-                        odom.set_angle(yaw)
-                        
+                        sync_pose_ang_to_yaw()
                         self.mode = 5
                         goal_angle = pi/2
                 elif self.mode == 5:
@@ -267,6 +249,7 @@ class Robot():
                 if pose != (0, 0, 0):
                     send_json({
                         "pose": list(pose),
+                        "gz": gz,
                         "yaw": yaw,
                         "dist_L": dist_L,
                         "dist_R": dist_R,
