@@ -1,6 +1,6 @@
 # steertest.py
 """
-An exploration of how to optimize turning (in place) with less
+An exploration of how to optimize turning (in place) with reduced
 oscillation and hunting by using a PID loop within bang-bang limits.
 
 When turning in place (linear_speed = 0), the P-gain needs to be
@@ -22,6 +22,8 @@ from parameters import ANGLE_TOL
 from bno08x_i2c import *
 import time
 
+# setup onboard LED
+led = machine.Pin("LED", machine.Pin.OUT)
 
 # set up BNO08x IMU on i2c1
 i2c1 = I2C(1, sda=Pin(14), scl=Pin(15), freq=100000, timeout=200000 )
@@ -79,16 +81,19 @@ if __name__ == "__main__":
             done = turn(-pi/4)  # 45 deg right
             if done:
                 break
+            led.toggle()
             time.sleep(0.1)
         while True:
             done = turn(pi/4)  # 45 deg left
             if done:
                 break
+            led.toggle()
             time.sleep(0.1)
         while True:
             done = turn(0)  # back to 0
             if done:
                 break
+            led.toggle()
             time.sleep(0.1)
 
     finally:

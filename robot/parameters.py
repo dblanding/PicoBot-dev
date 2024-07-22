@@ -24,3 +24,8 @@ ANGLE_TOL = 0.035  # radians (2 degrees)
 
 # ratio of spd to joystick value
 JS_GAIN = 2
+
+# For turning in place
+MAX_ANG_SPD = 0.7
+P_TURN_GAIN = 8.0  # Proportional Gain
+D_TURN_GAIN = 0.5  # Derivative Gain

@@ -21,6 +21,7 @@ from machine import I2C, Pin, UART
 import motors
 from odometer import Odometer
 from parameters import JS_GAIN, ANGLE_TOL, SWATH_PITCH
+from parameters import P_TURN_GAIN, D_TURN_GAIN, MAX_ANG_SPD
 import struct
 from bno08x_i2c import *
 import VL53L0X
@@ -55,7 +56,7 @@ i2c0 = I2C(0, sda=Pin(12), scl=Pin(13))
 
 # set up BNO08x IMU on i2c1
 i2c1 = I2C(1, sda=Pin(14), scl=Pin(15), freq=100000, timeout=200000 )
-print("I2C Device found at address : ",i2c1.scan(),"\n")
+print("I2C address of device(s) found: ",i2c1.scan(),"\n")
 bno = BNO08X_I2C(i2c1, debug=False)
 bno.enable_feature(BNO_REPORT_ACCELEROMETER)
 #bno.enable_feature(BNO_REPORT_MAGNETOMETER)
@@ -90,6 +91,30 @@ def get_imu_data():
         yaw += 2 * pi
     return gz, yaw
 
+def turn(goal_angle, gz, yaw):
+    """
+    Return ang_spd needed to drive motors in order to
+    turn in place to goal_angle (radians).
+    Positive angles are to the left, negative to the right
+    """
+    # calculate proper ang_spd to steer to goal_angle
+    yaw_err = yaw - goal_angle
+    p = -(yaw_err * P_TURN_GAIN)  # proportional term
+    d = -(gz * D_TURN_GAIN)  # derivative term
+    ang_spd = p + d
+    
+    # limit value of ang_spd
+    if ang_spd < -MAX_ANG_SPD:
+        ang_spd = -MAX_ANG_SPD
+    if ang_spd > MAX_ANG_SPD:
+        ang_spd = MAX_ANG_SPD
+    
+    # check if turn is complete
+    if abs(gz) < 0.01 and abs(yaw_err) < ANGLE_TOL:
+        ang_spd = 0
+    
+    return ang_spd
+
 def sync_pose_ang_to_yaw():
     gz, yaw = get_imu_data()
     # Wait for value of gz to settle to near zero
@@ -116,8 +141,7 @@ class Robot():
     def __init__(self):
 
         # set up some starting values
-        self.lin_spd = 0
-        self.ang_spd = 0
+        self.lin_spd = 0.4
         self.run = True
         self.mode = 0
 
@@ -128,10 +152,6 @@ class Robot():
     async def main(self):
         try:
             while self.run:
-
-                # get IMU data
-                gz, yaw = get_imu_data()
-
                 # read distances from VCSEL sensors
                 dist_L = get_dist(b'\x02')
                 dist_R = get_dist(b'\x04')
@@ -140,108 +160,130 @@ class Robot():
                 # get current pose
                 pose = odom.update(enc_a.value(), enc_b.value())
 
-                # Drive in a back & forth parallel line pattern
+                # get IMU data
+                gz, yaw = get_imu_data()
+
+                # Drive in a back & forth "S & R" pattern
                 if self.mode == 0:
-                    # initial 90 deg turn to right
+                    # turn to face -Y direction
+                    goal_angle = -pi/2
+
                     # suppress distance values while turning
                     dist_L = 2000
                     dist_R = 2000
                     dist_F = 2000
-                    goal_angle = -pi/2
-                    if yaw > (goal_angle + ANGLE_TOL):
-                        motors.drive_motors(0, -0.6)
-                    elif yaw < (goal_angle - ANGLE_TOL):
-                        motors.drive_motors(0, 0.6)
-                    else:
-                        motors.drive_motors(0, 0)
+
+                    # turn in place to goal angle
+                    ang_spd = turn(goal_angle, gz, yaw)
+                    motors.drive_motors(0, ang_spd)
+
+                    # when turn is complete
+                    if ang_spd == 0:
                         sync_pose_ang_to_yaw()
-                        gz, yaw = get_imu_data()
                         pose = odom.update(enc_a.value(), enc_b.value())
                         self.mode = 1
+
                 elif self.mode == 1:
-                    # drive -y direction, steering to goal angle
-                    self.lin_spd = 0.4
-                    kp = -(yaw - goal_angle)  # proportional term
-                    kd = -(gz * D_GAIN)  # derivative term
-                    self.ang_spd = kp + kd
-                    motors.drive_motors(self.lin_spd, self.ang_spd)
+                    # drive -y direction, steering to goal_angle
+                    p = -(yaw - goal_angle)  # proportional term
+                    d = -(gz * D_GAIN)  # derivative term
+                    ang_spd = p + d
+                    motors.drive_motors(self.lin_spd, ang_spd)
+
+                    # upon detecting obstruction
                     if dist_F < 500:
                         motors.drive_motors(0, 0)
                         self.mode = 2
+
                 elif self.mode == 2:
-                    # turn 90 deg left
+                    # turn to face +X direction
+                    goal_angle = 0
+
                     # suppress distance values while turning
                     dist_L = 2000
                     dist_R = 2000
                     dist_F = 2000
-                    goal_angle = 0
-                    if yaw > (goal_angle + ANGLE_TOL):
-                        motors.drive_motors(0, -0.6)
-                    elif yaw < (goal_angle - ANGLE_TOL):
-                        motors.drive_motors(0, 0.6)
-                    else:
-                        motors.drive_motors(0, 0)
-                        self.mode = 3
+
+                    # turn in place to goal angle
+                    ang_spd = turn(goal_angle, gz, yaw)
+                    motors.drive_motors(0, ang_spd)
+
+                    # when turn is complete
+                    if ang_spd == 0:
+                        pose = odom.update(enc_a.value(), enc_b.value())
                         next_swath = pose[0] + SWATH_PITCH
+                        self.mode = 3
+
                 elif self.mode == 3:
                     # jog +x to next swath, steering to goal angle
-                    self.lin_spd = 0.4
-                    kp = -(yaw - goal_angle)  # proportional term
-                    kd = -(gz * D_GAIN)  # derivative term
-                    self.ang_spd = kp + kd
-                    motors.drive_motors(self.lin_spd, self.ang_spd)
-                    if pose[0] > next_swath:
-                        self.mode = 4
+                    p = -(yaw - goal_angle)  # proportional term
+                    d = -(gz * D_GAIN)  # derivative term
+                    ang_spd = p + d
+                    motors.drive_motors(self.lin_spd, ang_spd)
+
+                    # upon reaching next_swath
+                    if pose[0] >= next_swath:
                         motors.drive_motors(0, 0)
+                        self.mode = 4
+
                 elif self.mode == 4:
-                    # turn 90 deg left
+                    # turn to face +Y direction
+                    goal_angle = pi/2
+
                     # suppress distance values while turning
                     dist_L = 2000
                     dist_R = 2000
                     dist_F = 2000
-                    goal_angle = pi/2
-                    if yaw > (goal_angle + ANGLE_TOL):
-                        motors.drive_motors(0, -0.6)
-                    elif yaw < (goal_angle - ANGLE_TOL):
-                        motors.drive_motors(0, 0.6)
-                    else:
-                        motors.drive_motors(0, 0)
+
+                    # turn in place to goal angle
+                    ang_spd = turn(goal_angle, gz, yaw)
+                    motors.drive_motors(0, ang_spd)
+
+                    # when turn is complete
+                    if ang_spd == 0:
                         sync_pose_ang_to_yaw()
                         self.mode = 5
-                        goal_angle = pi/2
+
                 elif self.mode == 5:
                     # drive +y direction, steering to goal angle
-                    self.lin_spd = 0.4
-                    kp = -(yaw - goal_angle)  # proportional term
-                    kd = -(gz * D_GAIN)  # derivative term
-                    self.ang_spd = kp + kd
-                    motors.drive_motors(self.lin_spd, self.ang_spd)
+                    p = -(yaw - goal_angle)  # proportional term
+                    d = -(gz * D_GAIN)  # derivative term
+                    ang_spd = p + d
+                    motors.drive_motors(self.lin_spd, ang_spd)
+
+                    # upon detecting obstruction
                     if dist_F < 500:
                         motors.drive_motors(0, 0)
                         self.mode = 6
+
                 elif self.mode == 6:
                     # turn right 90 deg
+                    goal_angle = 0
+
                     # suppress distance values while turning
                     dist_L = 2000
                     dist_R = 2000
                     dist_F = 2000
-                    goal_angle = 0
-                    if yaw > (goal_angle + ANGLE_TOL):
-                        motors.drive_motors(0, -0.6)
-                    elif yaw < (goal_angle - ANGLE_TOL):
-                        motors.drive_motors(0, 0.6)
-                    else:
-                        motors.drive_motors(0, 0)
-                        self.mode = 7
+
+                    # turn in place to goal angle
+                    ang_spd = turn(goal_angle, gz, yaw)
+                    motors.drive_motors(0, ang_spd)
+
+                    # when turn is complete
+                    if ang_spd == 0:
+                        pose = odom.update(enc_a.value(), enc_b.value())
                         next_swath = pose[0] + SWATH_PITCH
+                        self.mode = 7
+
                 elif self.mode == 7:
                     # jog +x to next swath, steering to goal angle
-                    self.lin_spd = 0.4
-                    kp = -(yaw - goal_angle)  # proportional term
-                    kd = -(gz * D_GAIN)  # derivative term
-                    self.ang_spd = kp + kd
-                    motors.drive_motors(self.lin_spd, self.ang_spd)
-                    if pose[0] > next_swath:
+                    p = -(yaw - goal_angle)  # proportional term
+                    d = -(gz * D_GAIN)  # derivative term
+                    ang_spd = p + d
+                    motors.drive_motors(self.lin_spd, ang_spd)
+
+                    # upon reaching next_swath
+                    if pose[0] >= next_swath:
                         motors.drive_motors(0, 0)
                         self.mode = 0
 
