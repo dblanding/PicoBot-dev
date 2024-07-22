@@ -3,7 +3,7 @@
 # car geometry
 TRACK_WIDTH = 0.172  # meters
 WHEEL_CIRC = 0.214  # meters
-SWATH_PITCH = 0.43  # line spacing (m) of parallel line pattern
+SWATH_PITCH = 0.42  # line spacing (m) of parallel line pattern
 
 # encoder / gearbox
 TICKS_PER_REV = 2464

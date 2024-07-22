@@ -18,7 +18,7 @@ will work fine when steering along a track toward a goal_angle.
 from math import pi
 from machine import I2C, Pin, UART
 import motors
-from parameters import ANGLE_TOL
+from parameters import ANGLE_TOL, P_TURN_GAIN, D_TURN_GAIN, MAX_ANG_SPD
 from bno08x_i2c import *
 import time
 
@@ -45,53 +45,63 @@ def get_imu_data():
         yaw += 2 * pi
     return gz, yaw
 
-def turn(goal_angle):
+def turn(goal_angle, gz, yaw):
     """
-    Starting at an initial yaw angle (zero, in this case)
-    Turn in place to goal_angle (radians)
+    Return ang_spd needed to drive motors in order to
+    turn in place to goal_angle (radians).
     Positive angles are to the left, negative to the right
     """
-    done = False
-    # get IMU data
-    gz, yaw = get_imu_data()
-
-    # steer to goal angle
+    # calculate proper ang_spd to steer to goal_angle
     yaw_err = yaw - goal_angle
-    kp = -(yaw_err * P_GAIN)  # proportional term
-    kd = -(gz * D_GAIN)  # derivative term
-    ang_spd = kp + kd
+    p = -(yaw_err * P_TURN_GAIN)  # proportional term
+    d = -(gz * D_TURN_GAIN)  # derivative term
+    ang_spd = p + d
+    
+    # limit value of ang_spd
     if ang_spd < -MAX_ANG_SPD:
         ang_spd = -MAX_ANG_SPD
     if ang_spd > MAX_ANG_SPD:
         ang_spd = MAX_ANG_SPD
+    
+    # check if turn is complete
     if abs(gz) < 0.01 and abs(yaw_err) < ANGLE_TOL:
         ang_spd = 0
-        done = True
-    motors.drive_motors(0, ang_spd)
-    ang_deg = yaw*180/pi
-    print(ang_spd, gz, ang_deg)
-    return done
+    # give an extra boost if needed to break past static friction
+    elif abs(gz) < 0.01 and abs(yaw_err) < 3 * ANGLE_TOL:
+        ang_spd *= 2
+        print("needed a boost!")
+    
+    return ang_spd
 
 if __name__ == "__main__":
     try:
-        MAX_ANG_SPD = 0.7
-        P_GAIN = 8.0  # Proportional Gain
-        D_GAIN = 0.5  # Derivative Gain
+        goal_angle = -pi/2  # turn to face -Y direction
         while True:
-            done = turn(-pi/4)  # 45 deg right
-            if done:
+            gz, yaw = get_imu_data()
+            ang_spd = turn(goal_angle, gz, yaw)
+            motors.drive_motors(0, ang_spd)
+            # when turn is complete
+            if ang_spd == 0:
                 break
             led.toggle()
             time.sleep(0.1)
+        goal_angle = pi/2  # turn to face -Y direction
         while True:
-            done = turn(pi/4)  # 45 deg left
-            if done:
+            gz, yaw = get_imu_data()
+            ang_spd = turn(goal_angle, gz, yaw)
+            motors.drive_motors(0, ang_spd)
+            # when turn is complete
+            if ang_spd == 0:
                 break
             led.toggle()
             time.sleep(0.1)
+        goal_angle = 0  # turn to face -Y direction
         while True:
-            done = turn(0)  # back to 0
-            if done:
+            gz, yaw = get_imu_data()
+            ang_spd = turn(goal_angle, gz, yaw)
+            motors.drive_motors(0, ang_spd)
+            # when turn is complete
+            if ang_spd == 0:
                 break
             led.toggle()
             time.sleep(0.1)

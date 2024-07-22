@@ -29,12 +29,13 @@
 * [robot folder](robot) contains files that are run on the Pico
 
 * to Run:
-    1. Start the file `main.py` on the robot (either in Thonny or just power up the PicoBot.)
-    2. Open the Bluefruit connect app (cell phone)
+    1. Place the PicoBot at pose (0, 0, 0) on the floor of the arena.
+    2. Turn the PicoBot power switch to **ON**. This starts the file `main.py` on the robot.
+    3. Open the Bluefruit connect app (cell phone)
         * then connect to the first listed of the 2 BLE UART Friend devices
         * then select Controller
         * then select Accelerometer.
-    3. On the laptop, run the file `display_from_robot.py`. It's important to have the phone app already connected so the laptop has no other choice but to connect to the device on uart1.
+    4. On the laptop, run the file `display_from_robot.py`. It's important to have the phone app already connected so the laptop has no other choice but to connect to the device on uart1.
 
     ![bluefruit connect app](imgs/bluefruit_connect_app.png)
 
@@ -50,12 +51,13 @@
 
 ![PicoBot w/ all 3 distance sensors](imgs/with_fwd_dist_sensor.jpg)
 
-* Use vector addition to calculate detected points
+* Use vector addition to calculate the location of detected points.
 
 ![Vector Addition](imgs/vector-addition.jpg)
 
 ### Customize arena and plot points detected by distance sensors
 * Starting at origin of arena with pose = (0, 0, 0)
+
 ![Starting at Home](imgs/run1_start.png)
 
 * Run No. 1 
@@ -71,7 +73,7 @@
 
 ![Run #2](imgs/run2.png)
 
-### Instead of Tele-Op, program robot to drive a Search & Rescue pattern
+### Revise driving program: Replace Tele-Operation with a program to drive along a Search & Rescue pattern
 * First, do a simple right turn and adjust TRACK_WIDTH until Odometer pose_angle agrees with IMU yaw angle
 * Next, drive a long straight leg with a goal_angle = 0 to make sure that pose_angle and yaw are nearly equal at the end of the leg.
 * Now we're ready to drive the S&R pattern

@@ -91,30 +91,6 @@ def get_imu_data():
         yaw += 2 * pi
     return gz, yaw
 
-def turn(goal_angle, gz, yaw):
-    """
-    Return ang_spd needed to drive motors in order to
-    turn in place to goal_angle (radians).
-    Positive angles are to the left, negative to the right
-    """
-    # calculate proper ang_spd to steer to goal_angle
-    yaw_err = yaw - goal_angle
-    p = -(yaw_err * P_TURN_GAIN)  # proportional term
-    d = -(gz * D_TURN_GAIN)  # derivative term
-    ang_spd = p + d
-    
-    # limit value of ang_spd
-    if ang_spd < -MAX_ANG_SPD:
-        ang_spd = -MAX_ANG_SPD
-    if ang_spd > MAX_ANG_SPD:
-        ang_spd = MAX_ANG_SPD
-    
-    # check if turn is complete
-    if abs(gz) < 0.01 and abs(yaw_err) < ANGLE_TOL:
-        ang_spd = 0
-    
-    return ang_spd
-
 def sync_pose_ang_to_yaw():
     gz, yaw = get_imu_data()
     # Wait for value of gz to settle to near zero
@@ -142,8 +118,43 @@ class Robot():
 
         # set up some starting values
         self.lin_spd = 0.4
+        self.ang_spd = 0
         self.run = True
         self.mode = 0
+
+    def turn(self, goal_angle, gz, yaw):
+        """
+        Return ang_spd needed to drive motors in order to
+        turn in place to goal_angle (radians).
+        Positive angles are to the left, negative to the right
+        """
+        # calculate proper ang_spd to steer to goal_angle
+        yaw_err = yaw - goal_angle
+        p = -(yaw_err * P_TURN_GAIN)  # proportional term
+        d = -(gz * D_TURN_GAIN)  # derivative term
+        ang_spd = p + d
+
+        # limit value of ang_spd
+        if ang_spd < -MAX_ANG_SPD:
+            ang_spd = -MAX_ANG_SPD
+        if ang_spd > MAX_ANG_SPD:
+            ang_spd = MAX_ANG_SPD
+
+        # check if turn is complete
+        if abs(gz) < 0.01 and abs(yaw_err) < ANGLE_TOL:
+            ang_spd = 0
+        # give an extra boost if needed to overcome static friction
+        elif abs(gz) < 0.01 and abs(yaw_err) < 3 * ANGLE_TOL:
+            # if it has not been previously boosted
+            if not self.ang_spd:
+                ang_spd *= 1.5
+                self.ang_spd = ang_spd
+            else:  # boost it further
+                ang_spd = self.ang_spd * 1.5
+                self.ang_spd = 0
+            
+
+        return ang_spd
 
     def stop(self):
         self.run = False
@@ -174,7 +185,7 @@ class Robot():
                     dist_F = 2000
 
                     # turn in place to goal angle
-                    ang_spd = turn(goal_angle, gz, yaw)
+                    ang_spd = self.turn(goal_angle, gz, yaw)
                     motors.drive_motors(0, ang_spd)
 
                     # when turn is complete
@@ -191,7 +202,7 @@ class Robot():
                     motors.drive_motors(self.lin_spd, ang_spd)
 
                     # upon detecting obstruction
-                    if dist_F < 500:
+                    if pose[1] < -1.3:  # dist_F < 500:
                         motors.drive_motors(0, 0)
                         self.mode = 2
 
@@ -205,7 +216,7 @@ class Robot():
                     dist_F = 2000
 
                     # turn in place to goal angle
-                    ang_spd = turn(goal_angle, gz, yaw)
+                    ang_spd = self.turn(goal_angle, gz, yaw)
                     motors.drive_motors(0, ang_spd)
 
                     # when turn is complete
@@ -236,7 +247,7 @@ class Robot():
                     dist_F = 2000
 
                     # turn in place to goal angle
-                    ang_spd = turn(goal_angle, gz, yaw)
+                    ang_spd = self.turn(goal_angle, gz, yaw)
                     motors.drive_motors(0, ang_spd)
 
                     # when turn is complete
@@ -266,7 +277,7 @@ class Robot():
                     dist_F = 2000
 
                     # turn in place to goal angle
-                    ang_spd = turn(goal_angle, gz, yaw)
+                    ang_spd = self.turn(goal_angle, gz, yaw)
                     motors.drive_motors(0, ang_spd)
 
                     # when turn is complete
