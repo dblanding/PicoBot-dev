@@ -117,18 +117,18 @@ class Robot():
     def __init__(self):
 
         # set up some starting values
-        self.lin_spd = 0.4
-        self.ang_spd = 0
+        self.lin_spd = 0.4  # nominal drive speed
+        self.ang_spd = 0  # prev value ang_spd only when stuck
         self.run = True
         self.mode = 0
 
     def turn(self, goal_angle, gz, yaw):
         """
-        Return ang_spd needed to drive motors in order to
-        turn in place to goal_angle (radians).
-        Positive angles are to the left, negative to the right
+        Return ang_spd needed to drive motors when
+        turning in place to goal_angle (radians).
+        self.ang_spd is used to remember prev ang_spd when stuck
         """
-        # calculate proper ang_spd to steer to goal_angle
+        # calculate ang_spd to steer to goal_angle
         yaw_err = yaw - goal_angle
         p = -(yaw_err * P_TURN_GAIN)  # proportional term
         d = -(gz * D_TURN_GAIN)  # derivative term
@@ -140,25 +140,28 @@ class Robot():
         if ang_spd > MAX_ANG_SPD:
             ang_spd = MAX_ANG_SPD
 
+        # reset self.ang_spd to zero if not stuck
+        if abs(gz) > 0.01:
+            self.ang_spd = 0
+
         # check if turn is complete
         if abs(gz) < 0.01 and abs(yaw_err) < ANGLE_TOL:
             ang_spd = 0
+
         # give an extra boost if needed to overcome static friction
         elif abs(gz) < 0.01 and abs(yaw_err) < 3 * ANGLE_TOL:
-            # if it has not been previously boosted
-            if not self.ang_spd:
+            if not self.ang_spd:  # not previously boosted
                 ang_spd *= 1.5
                 self.ang_spd = ang_spd
             else:  # boost it further
                 ang_spd = self.ang_spd * 1.5
                 self.ang_spd = 0
-            
 
         return ang_spd
 
     def stop(self):
         self.run = False
-        motors.drive_motors(0.0, 0.0)
+        motors.drive_motors(0, 0)
 
     async def main(self):
         try:
@@ -176,19 +179,17 @@ class Robot():
 
                 # Drive in a back & forth "S & R" pattern
                 if self.mode == 0:
-                    # turn to face -Y direction
-                    goal_angle = -pi/2
-
                     # suppress distance values while turning
                     dist_L = 2000
                     dist_R = 2000
                     dist_F = 2000
 
-                    # turn in place to goal angle
+                    # turn in place to face -Y direction
+                    goal_angle = -pi/2
                     ang_spd = self.turn(goal_angle, gz, yaw)
                     motors.drive_motors(0, ang_spd)
 
-                    # when turn is complete
+                    # until turn is complete
                     if ang_spd == 0:
                         sync_pose_ang_to_yaw()
                         pose = odom.update(enc_a.value(), enc_b.value())
@@ -201,7 +202,7 @@ class Robot():
                     ang_spd = p + d
                     motors.drive_motors(self.lin_spd, ang_spd)
 
-                    # upon detecting obstruction
+                    # stop
                     if pose[1] < -1.3:  # dist_F < 500:
                         motors.drive_motors(0, 0)
                         self.mode = 2
@@ -226,33 +227,32 @@ class Robot():
                         self.mode = 3
 
                 elif self.mode == 3:
-                    # jog +x to next swath, steering to goal angle
+                    # jog +X direction to next swath
                     p = -(yaw - goal_angle)  # proportional term
                     d = -(gz * D_GAIN)  # derivative term
                     ang_spd = p + d
                     motors.drive_motors(self.lin_spd, ang_spd)
 
-                    # upon reaching next_swath
+                    # stop at next_swath
                     if pose[0] >= next_swath:
                         motors.drive_motors(0, 0)
                         self.mode = 4
 
                 elif self.mode == 4:
-                    # turn to face +Y direction
-                    goal_angle = pi/2
-
                     # suppress distance values while turning
                     dist_L = 2000
                     dist_R = 2000
                     dist_F = 2000
 
-                    # turn in place to goal angle
+                    # turn in place to face +Y direction
+                    goal_angle = pi/2
                     ang_spd = self.turn(goal_angle, gz, yaw)
                     motors.drive_motors(0, ang_spd)
 
-                    # when turn is complete
+                    # until turn is complete
                     if ang_spd == 0:
                         sync_pose_ang_to_yaw()
+                        pose = odom.update(enc_a.value(), enc_b.value())
                         self.mode = 5
 
                 elif self.mode == 5:
@@ -262,7 +262,7 @@ class Robot():
                     ang_spd = p + d
                     motors.drive_motors(self.lin_spd, ang_spd)
 
-                    # upon detecting obstruction
+                    # stop
                     if dist_F < 500:
                         motors.drive_motors(0, 0)
                         self.mode = 6
@@ -287,13 +287,13 @@ class Robot():
                         self.mode = 7
 
                 elif self.mode == 7:
-                    # jog +x to next swath, steering to goal angle
+                    # jog +x to next swath
                     p = -(yaw - goal_angle)  # proportional term
                     d = -(gz * D_GAIN)  # derivative term
                     ang_spd = p + d
                     motors.drive_motors(self.lin_spd, ang_spd)
 
-                    # upon reaching next_swath
+                    # stop at next_swath
                     if pose[0] >= next_swath:
                         motors.drive_motors(0, 0)
                         self.mode = 0
