@@ -121,6 +121,7 @@ class Robot():
         self.ang_spd = 0  # prev value ang_spd only when stuck
         self.run = True
         self.mode = 'T'  # 'T' for tele-op, 0 for S&R pattern
+        self.errors = []
 
     def turn(self, goal_angle, gz, yaw):
         """
@@ -190,13 +191,13 @@ class Robot():
                                 self.lin_spd = y * JS_GAIN
                                 self.ang_spd = -x * JS_GAIN
                         except Exception as e:
-                            print(e)
+                            self.errors.append(e)
 
                         # send commands to motors
                         motors.drive_motors(self.lin_spd, self.ang_spd)
 
                 # Drive in a back & forth "S & R" pattern
-                if self.mode == 0:
+                elif self.mode == 0:
                     # suppress distance values while turning
                     dist_L = 2000
                     dist_R = 2000
@@ -316,24 +317,6 @@ class Robot():
                         motors.drive_motors(0, 0)
                         self.mode = 0
 
-                else:
-                    # Drive in tele-op mode
-                    if uart0.any() > 0:
-                        try:
-                            # get Bluetooth command
-                            bytestring = uart0.readline()
-                            data_type = bytestring[:2].decode()
-                            bin_value = bytestring[2:14]
-                            if data_type == '!A':  # accelerometer data
-                                x, y, z = struct.unpack('3f', bin_value)
-                                self.lin_spd = y * JS_GAIN
-                                self.ang_spd = -x * JS_GAIN
-                        except Exception as e:
-                            print(e)
-
-                        # send commands to motors
-                        motors.drive_motors(self.lin_spd, self.ang_spd)
-
                 # send robot data to laptop
                 if pose != (0, 0, 0):
                     send_json({
@@ -343,10 +326,12 @@ class Robot():
                         "dist_L": dist_L,
                         "dist_R": dist_R,
                         "dist_F": dist_F,
+                        "errors": self.errors,
                         })
 
                 led.toggle()
                 await asyncio.sleep(0.1)
+
         finally:
             motors.drive_motors(0, 0)
 
