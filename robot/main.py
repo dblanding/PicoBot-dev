@@ -180,14 +180,17 @@ class Robot():
                 # Drive in tele-op mode
                 if self.mode == 'T':
                     if uart0.any() > 0:
-                        # get Bluetooth command
-                        bytestring = uart0.readline()
-                        data_type = bytestring[:2].decode()
-                        bin_value = bytestring[2:14]
-                        if data_type == '!A':  # accelerometer data
-                            x, y, z = struct.unpack('3f', bin_value)
-                            self.lin_spd = y * JS_GAIN
-                            self.ang_spd = -x * JS_GAIN
+                        try:
+                            # get Bluetooth command
+                            bytestring = uart0.readline()
+                            data_type = bytestring[:2].decode()
+                            bin_value = bytestring[2:14]
+                            if data_type == '!A':  # accelerometer data
+                                x, y, z = struct.unpack('3f', bin_value)
+                                self.lin_spd = y * JS_GAIN
+                                self.ang_spd = -x * JS_GAIN
+                        except Exception as e:
+                            print(e)
 
                         # send commands to motors
                         motors.drive_motors(self.lin_spd, self.ang_spd)
@@ -316,14 +319,17 @@ class Robot():
                 else:
                     # Drive in tele-op mode
                     if uart0.any() > 0:
-                        # get Bluetooth command
-                        bytestring = uart0.readline()
-                        data_type = bytestring[:2].decode()
-                        bin_value = bytestring[2:14]
-                        if data_type == '!A':  # accelerometer data
-                            x, y, z = struct.unpack('3f', bin_value)
-                            self.lin_spd = y * JS_GAIN
-                            self.ang_spd = -x * JS_GAIN
+                        try:
+                            # get Bluetooth command
+                            bytestring = uart0.readline()
+                            data_type = bytestring[:2].decode()
+                            bin_value = bytestring[2:14]
+                            if data_type == '!A':  # accelerometer data
+                                x, y, z = struct.unpack('3f', bin_value)
+                                self.lin_spd = y * JS_GAIN
+                                self.ang_spd = -x * JS_GAIN
+                        except Exception as e:
+                            print(e)
 
                         # send commands to motors
                         motors.drive_motors(self.lin_spd, self.ang_spd)
