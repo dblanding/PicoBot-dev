@@ -89,6 +89,12 @@ class RobotDisplay:
         print(f"Sending request: {request}")
         await self.ble_connection.send_uart_data(request)
 
+    def tele(self, _):
+        self.button_task = asyncio.create_task(self.send_command("tele"))
+
+    def auto(self, _):
+        self.button_task = asyncio.create_task(self.send_command("auto"))
+
     def start(self, _):
         self.button_task = asyncio.create_task(self.send_command("start"))
 
@@ -101,9 +107,13 @@ class RobotDisplay:
         try:
             await self.send_command("arena")
             self.fig.canvas.mpl_connect("close_event", self.handle_close)
-            start_button = Button(plt.axes([0.6, 0.05, 0.1, 0.075]), "Start")
+            tele_button = Button(plt.axes([0.2, 0.85, 0.1, 0.075]), "Tele")
+            tele_button.on_clicked(self.tele)
+            auto_button = Button(plt.axes([0.4, 0.85, 0.1, 0.075]), "Auto")
+            auto_button.on_clicked(self.auto)
+            start_button = Button(plt.axes([0.6, 0.85, 0.1, 0.075]), "Start")
             start_button.on_clicked(self.start)
-            stop_button = Button(plt.axes([0.8, 0.05, 0.1, 0.075]), "Stop")
+            stop_button = Button(plt.axes([0.8, 0.85, 0.1, 0.075]), "Stop")
             stop_button.on_clicked(self.stop)
             while not self.closed:
                 self.draw()

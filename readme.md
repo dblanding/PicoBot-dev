@@ -91,3 +91,9 @@
 
 * Trip [data](data/s&r_data.txt) shows the record of the trip
 
+### Implement selectable Tele-Op or Autonomous Driving
+
+![Autonomous](imgs/sr.png)
+
+![Tele-Op](imgs/to.png)
+

@@ -1,32 +1,34 @@
 # main.py
 """
 MicroPython code for PicoBot project w/ 2 BLE UART Friend modules
-* Tele-op driving commands come in on uart0
-* Robot data sent out to laptop on uart1
 * Raspberry Pi Pico mounted on differential drive robot
 * 56:1 gear motors with encoders
-* 3 VL53L0X tof distance sensors
+* Tele-op driving commands come in on uart0
+* Robot data sent out to laptop on uart1
+* 3 VL53L0X tof distance sensors: Left, Right, Forward
 * BNO08x IMU
-
-Notes on angular units:
-Use radians: pose_angle (from odometer) and yaw (from IMU)
-0 at the X axis (initially straight ahead), pos CCW / neg CW
+* Units:
+    * distances: (m) everywhere except sensor_distance (mm)
+    * angles: (radians) Zero along X-axis, increasing CCW
+        * pose_angle (from odometer)
+        * yaw and yaw_rate (from IMU)
 """
+
 import asyncio
 import encoder_rp2 as encoder
 import gc
 import json
-from math import pi
 from machine import I2C, Pin, UART
+from math import pi
 import motors
 from odometer import Odometer
 from parameters import JS_GAIN, ANGLE_TOL, SWATH_PITCH
 from parameters import P_TURN_GAIN, D_TURN_GAIN, MAX_ANG_SPD
 import struct
+import time
 from bno08x_i2c import *
 import VL53L0X
 import arena
-import time
 
 D_GAIN = 0.286  # Gain of Derivative feedback term
 
@@ -123,6 +125,14 @@ class Robot():
         self.mode = 'T'  # 'T' for tele-op, 0 for S&R pattern
         self.errors = []
 
+    def auto(self):
+        """Set mode to drive autonomously."""
+        self.mode = 0
+
+    def tele(self):
+        """Set mode to drive by tele-operation."""
+        self.mode = 'T'
+
     def turn(self, goal_angle, gz, yaw):
         """
         Return ang_spd needed to drive motors when
@@ -196,7 +206,7 @@ class Robot():
                         # send commands to motors
                         motors.drive_motors(self.lin_spd, self.ang_spd)
 
-                # Drive in a back & forth "S & R" pattern
+                # Drive autonomous back & forth "S & R" pattern
                 elif self.mode == 0:
                     # suppress distance values while turning
                     dist_L = 2000
@@ -336,7 +346,6 @@ class Robot():
             motors.drive_motors(0, 0)
 
 
-
 async def command_handler(robot):
     print("Starting handler")
     robot_task = None
@@ -354,6 +363,10 @@ async def command_handler(robot):
                     robot_task = asyncio.create_task(robot.main())
             elif request["command"] == "stop":
                 robot.stop()
+            elif request["command"] == "auto":
+                robot.auto()
+            elif request["command"] == "tele":
+                robot.tele()
 
         await asyncio.sleep(0.1)
 
