@@ -1,5 +1,8 @@
 # arena.py
-"""Represent the lines bounding arena (dimensions in m)"""
+"""
+Represent the lines bounding arena (dimensions in m)
+Single-room (small) arena
+"""
 
 boundary_lines = [
     [(-0.265, 1.73), (-0.265, 0.555)],
